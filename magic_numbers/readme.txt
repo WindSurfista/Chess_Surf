@@ -6,5 +6,5 @@ The relevant occupancy bits are hashed using the hash function and map to the co
 A magic number is more efficient the more constructive collisions they create, i.e. only occupancies which map to the same move bitboard collide.
 This is done to keep the size of the magic lookup table relatively small.
 
-As generating magic numbers does not use particularly complicated techniques which would tick boxes on the mark scheme and they only really need 
+As generating magic numbers does not use type of techniques which tick boxes on the mark scheme, are relatively time consuming to generate and they only need 
 to be generated once and then reused, I decided to avoid writing the generating code for these numbers, instead opting to find valid numbers online to save time.
