@@ -16,7 +16,7 @@ void ChessEngine::parse_FEN(char *FEN)
         {
             int piece = piece_string.find(*FEN);
             set_bit(chess_board.piece_boards[piece], index);
-            set_bit(chess_board.occupancies[(piece < 6)], index);
+            set_bit(chess_board.occupancies[(piece > 5)], index);
             index++;
         }
         FEN++;
@@ -64,7 +64,7 @@ void ChessEngine::parse_FEN(char *FEN)
 
 void ChessEngine::print_chessboard()
 {
-    std::string unicode_pieces[12] = {"♙", "♘", "♗", "♖", "♕", "♔", "♟︎", "♞", "♝", "♜", "♛", "♚"};
+    std::string unicode_pieces[12] = {"♟︎", "♞", "♝", "♜", "♛", "♚", "♙", "♘", "♗", "♖", "♕", "♔"};
 
     for (int i = 0; i < 8; i++)
     {
@@ -229,14 +229,16 @@ bool ChessEngine::check_if_attacked(bool side, int index) // Checks if a square 
     return false;
 }
 
-void inline ChessEngine::generate_pawn_moves(bool side, Board generation_board)
+
+// Todo: Currently class functions for testing and debugging change to inline function once able
+void ChessEngine::generate_pawn_moves(Board generation_board)
 {
-    int origin = 0;
-    int target = 0;
-    U64 bitboard = chess_board.piece_boards[P];
+    int origin;
+    int target;
+    U64 bitboard = generation_board.piece_boards[generation_board.side ? p : P];
     U64 captures = 0ULL;
     
-    if (side == white)
+    if (generation_board.side == white)
     {
         while (bitboard)
         {
@@ -277,12 +279,12 @@ void inline ChessEngine::generate_pawn_moves(bool side, Board generation_board)
                 {
                     std::cout << "Capture" << std::endl;
                 }
-                remove_bit(captures, index);
+                remove_bit(captures, target);
             }
         
             if (chess_board.enpassant != -1) // Enpassant moves
             {
-                if (check_bit(pawn_attacks[white][origin], chess_board.enpassant))
+                if (check_bit(pawn_attacks[generation_board.side][origin], chess_board.enpassant))
                 {
                     std::cout << "Enpassant" << std::endl;
                 }
@@ -349,22 +351,173 @@ void inline ChessEngine::generate_pawn_moves(bool side, Board generation_board)
     }
 }
 
-void inline ChessEngine::generate_king_moves(bool side, Board generation_board)
+void ChessEngine::generate_knight_moves(Board generation_board)
 {
-    if (side == white)
+    int origin;
+    int target;
+    U64 target_mask;
+    U64 bitboard = generation_board.piece_boards[generation_board.side ? n : N];
+
+    while (bitboard)
+    {
+        origin = index_least_sig(bitboard);
+        remove_bit(bitboard, origin);
+        target_mask = knight_attacks[origin] & ~generation_board.occupancies[generation_board.side];
+
+        while (target_mask)
+        {
+            target = index_least_sig(target_mask);
+            remove_bit(target_mask, target);
+            if (check_bit(generation_board.occupancies[!generation_board.side], target))
+            {
+                std::cout << "Knight capture" << std::endl;
+            }
+            else
+            {
+                std::cout << "Knight quiet" << std::endl;
+            }
+        }
+    }
+}
+
+void ChessEngine::generate_bishop_moves(Board generation_board)
+{
+    int origin;
+    int target;
+    U64 target_mask;
+    U64 bitboard = generation_board.piece_boards[generation_board.side ? b : B];
+
+    while (bitboard)
+    {
+        origin = index_least_sig(bitboard);
+        remove_bit(bitboard, origin);
+        target_mask = magic.get_bishop(origin, generation_board.occupancies[all]) & ~generation_board.occupancies[generation_board.side];
+
+        while (target_mask)
+        {
+            target = index_least_sig(target_mask);
+            remove_bit(target_mask, target);
+            if (check_bit(generation_board.occupancies[!generation_board.side], target))
+            {
+                std::cout << "Bishop Capture" << std::endl;
+            }
+            else
+            {
+                std::cout << "Bishop Quiet" << std::endl;
+            }
+        }
+    }
+}
+
+void ChessEngine::generate_rook_moves(Board generation_board)
+{
+    int origin;
+    int target;
+    U64 target_mask;
+    U64 bitboard = generation_board.piece_boards[generation_board.side ? r : R];
+
+    while (bitboard)
+    {
+        origin = index_least_sig(bitboard);
+        remove_bit(bitboard, origin);
+        target_mask = magic.get_rook(origin, generation_board.occupancies[all]) & ~generation_board.occupancies[generation_board.side];
+
+        while (target_mask)
+        {
+            target = index_least_sig(target_mask);
+            remove_bit(target_mask, target);
+            if (check_bit(generation_board.occupancies[!generation_board.side], target))
+            {
+                std::cout << "Rook Capture" << std::endl;
+            }
+            else
+            {
+                std::cout << "Rook Quiet" << std::endl;
+            }
+        }
+    }
+}
+
+void ChessEngine::generate_queen_moves(Board generation_board)
+{
+    int origin;
+    int target;
+    U64 target_mask;
+    U64 bitboard = generation_board.piece_boards[generation_board.side ? q : Q];
+
+    while (bitboard)
+    {
+        origin = index_least_sig(bitboard);
+        remove_bit(bitboard, origin);
+        target_mask = magic.get_queen(origin, generation_board.occupancies[all]) & ~generation_board.occupancies[generation_board.side];
+
+        while (target_mask)
+        {
+            target = index_least_sig(target_mask);
+            remove_bit(target_mask, target);
+            if (check_bit(generation_board.occupancies[!generation_board.side], target))
+            {
+                std::cout << "Queen Capture" << std::endl;
+            }
+            else
+            {
+                std::cout << "Queen Quiet" << std::endl;
+            }
+        }
+    }
+}
+
+void ChessEngine::generate_king_moves(Board generation_board)
+{
+    int origin;
+    int target;
+    U64 target_mask;
+    U64 bitboard = generation_board.piece_boards[generation_board.side ? k : K];
+
+    while (bitboard)
+    {
+        origin = index_least_sig(bitboard);
+        remove_bit(bitboard, origin);
+        target_mask = king_attacks[origin] & ~generation_board.occupancies[generation_board.side];
+
+        while (target_mask)
+        {
+            target = index_least_sig(target_mask);
+            remove_bit(target_mask, target);
+            if (check_bit(generation_board.occupancies[!generation_board.side], target))
+            {
+                std::cout << "King Capture" << std::endl;
+            }
+            else
+            {
+                std::cout << "King Quiet" << std::endl;
+            }
+        }
+    }
+}
+
+void ChessEngine::generate_castling_moves(Board generation_board)
+{
+    if (generation_board.side == white)
     {
         if (generation_board.castle & wk)
         {
-            if (check_bit(generation_board.occupancies[neither], f1) & check_bit(generation_board.occupancies[neither], g1))
+            if (check_bit(generation_board.occupancies[neither], f1) && check_bit(generation_board.occupancies[neither], g1))
             {
-                std::cout << "White king side castle" << std::endl;
+                if (!check_if_attacked(generation_board.side, e1) && !check_if_attacked(generation_board.side, f1))
+                {
+                    std::cout << "White side castle" << std::endl;
+                }
             }
         }
         if (generation_board.castle & wq)
         {
-            if (check_bit(generation_board.occupancies[neither], d1) & check_bit(generation_board.occupancies[neither], c1) & check_bit(generation_board.occupancies[neither], b1))
+            if (check_bit(generation_board.occupancies[neither], d1) && check_bit(generation_board.occupancies[neither], c1) && check_bit(generation_board.occupancies[neither], b1))
             {
-                std::cout << "White queen side castle" << std::endl;
+                if (!check_if_attacked(generation_board.side, e1) && !check_if_attacked(generation_board.side, d1))
+                {
+                    std::cout << "White queen side castle" << std::endl;
+                }
             }
         }
     }
@@ -372,29 +525,35 @@ void inline ChessEngine::generate_king_moves(bool side, Board generation_board)
     {
         if (generation_board.castle & bk)
         {
-            if (check_bit(generation_board.occupancies[neither], f8) & check_bit(generation_board.occupancies[neither], g8))
+            if (check_bit(generation_board.occupancies[neither], f8) && check_bit(generation_board.occupancies[neither], g8))
             {
-                std::cout << "Black king side castle" << std::endl;
+                if (!check_if_attacked(generation_board.side, e8) && !check_if_attacked(generation_board.side, f8))
+                {
+                    std::cout << "Black king side castle" << std::endl;
+                }
             }
         }
         if (generation_board.castle & bq)
         {
-            if (check_bit(generation_board.occupancies[neither], d8) & check_bit(generation_board.occupancies[neither], c8) & check_bit(generation_board.occupancies[neither], b8))
+            if (check_bit(generation_board.occupancies[neither], d8) && check_bit(generation_board.occupancies[neither], c8) && check_bit(generation_board.occupancies[neither], b8))
             {
-                std::cout << "Black queen side castle" << std::endl;
+                if (!check_if_attacked(generation_board.side, e8) && !check_if_attacked(generation_board.side, d8))
+                {
+                    std::cout << "Black queen side castle" << std::endl;
+                }
             }
         }
     }
 }
 
+// Possible optimisation: Check if the type of piece is on the board might speed up this function a bit?
 void ChessEngine::generate_moves(Board generation_board)
 {
-    if (generation_board.piece_boards[P])
-    {
-        generate_pawn_moves(white);
-    }
-    if (generation_board.piece_boards[K])
-    {
-        ;
-    }
+    generate_pawn_moves(generation_board);
+    generate_knight_moves(generation_board);
+    generate_bishop_moves(generation_board);
+    generate_rook_moves(generation_board);
+    generate_queen_moves(generation_board);
+    generate_king_moves(generation_board);
+    generate_castling_moves(generation_board);
 }

@@ -1,12 +1,14 @@
 #pragma once
 #include <stdio.h>
-#include <string.h>
+#include <string>
+#include <iostream>
 
 #define U64 unsigned long long
 #define check_bit(bitboard, index) ((bitboard >> index) & 1U)
 #define set_bit(bitboard, index) (bitboard |= (1ULL << index))
 #define remove_bit(bitboard, index) (bitboard &= ~(1ULL << index))
 
+// Todo: Remove the temporary constant variables
 const U64 no_a_file = 18374403900871474942ULL;
 const U64 no_h_file = 9187201950435737471ULL; 
 const U64 no_ab_file = 18229723555195321596ULL;
@@ -24,6 +26,8 @@ a2,b2,c2,d2,e2,f2,g2,h2,
 a1,b1,c1,d1,e1,f1,g1,h1
 };
 
+
+
 void print_bitboard(U64);
 
 inline static int hamming_weight(U64 bitboard)
@@ -37,7 +41,7 @@ inline static int hamming_weight(U64 bitboard)
     return count;
 }
 
-// Experimental binary search alternative left in cpp file for future testing
+// Possible optimisation: Experimental binary search alternative left in cpp file for future testing
 inline static int index_least_sig(U64 bitboard)
 {
     if (bitboard)

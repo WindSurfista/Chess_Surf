@@ -31,10 +31,18 @@ private:
 
 public:
     Board chess_board;
+    MagicMove magic;
     ChessEngine();
     void parse_FEN(char *FEN);
     void print_chessboard();
     bool check_if_attacked(bool side, int index);
 
-    void generate_pawn_moves(bool side);
+    void generate_pawn_moves(Board generation_board);
+    void generate_knight_moves(Board generation_board);
+    void generate_bishop_moves(Board generation_board);
+    void generate_rook_moves(Board generation_board);
+    void generate_queen_moves(Board generation_board);
+    void generate_king_moves(Board generation_board);
+    void generate_castling_moves(Board generation_board);
+    void generate_moves(Board generation_board);
 };
