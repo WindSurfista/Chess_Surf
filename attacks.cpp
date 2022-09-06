@@ -1,5 +1,6 @@
-#include "attacks.hpp"
 #include <iostream>
+#include "attacks.hpp"
+#include "move.hpp"
 
 void ChessEngine::parse_FEN(char *FEN)
 {
@@ -211,8 +212,8 @@ ChessEngine::ChessEngine()
     }
 }
 
-// Possible optimisation: Maintain an incrementally updated attacked squares bitboard in the chess engine class which is updated with each move. 
-bool ChessEngine::check_if_attacked(bool side, int index) // Checks if a square is dangerous for the side
+// Possible optimisation: Maintain an incrementally updated attacked squares bitboard in the chess engine class which is updated with each move.
+bool ChessEngine::check_if_attacked(Board chess_board, bool side, int index) // Checks if a square is dangerous for the side
 {
     if (pawn_attacks[side][index] & chess_board.piece_boards[p - 6 * side])
         return true;
@@ -229,15 +230,13 @@ bool ChessEngine::check_if_attacked(bool side, int index) // Checks if a square 
     return false;
 }
 
-
-// Todo: Currently class functions for testing and debugging change to inline function once able
-void ChessEngine::generate_pawn_moves(Board generation_board)
+/* inline void generate_pawn_moves(std::stack<int> move_stack, Board generation_board)
 {
     int origin;
     int target;
     U64 bitboard = generation_board.piece_boards[generation_board.side ? p : P];
     U64 captures = 0ULL;
-    
+
     if (generation_board.side == white)
     {
         while (bitboard)
@@ -246,15 +245,20 @@ void ChessEngine::generate_pawn_moves(Board generation_board)
             remove_bit(bitboard, origin);
             target = origin - 8;
 
-            if (check_bit(chess_board.occupancies[neither], target)) // Non - capture moves
+            if (check_bit(generation_board.occupancies[neither], target)) // Non - capture moves
             {
                 if (target <= 7)
                 {
-                    std::cout << "PROMOTION" << std::endl;
+                    move_stack.push(create_move(origin, target, P, Q, 0, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, P, R, 0, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, P, B, 0, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, P, N, 0, 0, 0, 0));
+                    // White pawn promotion
                 }
                 else
                 {
-                    std::cout << "Quiet move" << std::endl;
+                    move_stack.push(create_move(origin, target, P, 0, 0, 0, 0, 0));
+                    // White pawn quiet
                 }
 
                 if (origin >= 48)
@@ -262,34 +266,40 @@ void ChessEngine::generate_pawn_moves(Board generation_board)
                     target = origin - 16;
                     if (check_bit(chess_board.occupancies[neither], target))
                     {
-                        std::cout << "Double push" << std::endl;
+                        move_stack.push(create_move(origin, target, P, 0, 0, 1, 0, 0));
+                        // White pawn double
                     }
-                }     
+                }
             }
 
             captures = pawn_attacks[white][origin] & chess_board.occupancies[black];
-            while (captures) // Capture moves (No enpassant)
+            while (captures) // Capture moves
             {
                 target = index_least_sig(captures);
                 if (target <= 7)
                 {
-                    std::cout << "Promotion Capture" << std::endl;
+                    move_stack.push(create_move(origin, target, P, Q, 1, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, P, R, 1, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, P, B, 1, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, P, N, 1, 0, 0, 0));
+                    // White pawn promotion capture
                 }
                 else
                 {
-                    std::cout << "Capture" << std::endl;
+                    move_stack.push(create_move(origin, target, P, 0, 1, 0, 0, 0));
+                    // White pawn capture
                 }
                 remove_bit(captures, target);
             }
-        
+
             if (chess_board.enpassant != -1) // Enpassant moves
             {
-                if (check_bit(pawn_attacks[generation_board.side][origin], chess_board.enpassant))
+                if (check_bit(pawn_attacks[white][origin], generation_board.enpassant))
                 {
-                    std::cout << "Enpassant" << std::endl;
+                    move_stack.push(create_move(origin, generation_board, P, 0, 1, 0, 0, 1));
+                    // White pawn enpassant
                 }
             }
-
         }
     }
     else
@@ -308,11 +318,16 @@ void ChessEngine::generate_pawn_moves(Board generation_board)
             {
                 if (target >= 56)
                 {
-                    std::cout << "PROMOTION" << std::endl;
+                    move_stack.push(create_move(origin, target, p, q, 0, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, p, r, 0, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, p, b, 0, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, p, n, 0, 0, 0, 0));
+                    // Black pawn promotion
                 }
                 else
                 {
-                    std::cout << "Quiet move" << std::endl;
+                    move_stack.push(create_move(origin, target, p, 0, 0, 0, 0, 0));
+                    // Black pawn quiet
                 }
 
                 if (origin <= 15)
@@ -320,7 +335,8 @@ void ChessEngine::generate_pawn_moves(Board generation_board)
                     target = origin + 16;
                     if (check_bit(chess_board.occupancies[neither], target))
                     {
-                        std::cout << "Double push" << std::endl;
+                        move_stack.push(create_move(origin, target, p, 0, 0, 1, 0, 0));
+                        // Black pawn double
                     }
                 }
             }
@@ -331,27 +347,33 @@ void ChessEngine::generate_pawn_moves(Board generation_board)
                 target = index_least_sig(captures);
                 if (target >= 56) // White's home row
                 {
-                    std::cout << "Promotion Capture" << std::endl;
+                    move_stack.push(create_move(origin, target, p, q, 1, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, p, r, 1, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, p, b, 1, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, p, n, 1, 0, 0, 0));
+                    // Black pawn promotion capture
                 }
                 else
                 {
-                    std::cout << "Capture" << std::endl;
+                    move_stack.push(create_move(origin, target, p, 0, 1, 0, 0, 0));
+                    // Black pawn capture
                 }
                 remove_bit(captures, target);
             }
 
             if (chess_board.enpassant != -1) // Enpassant moves
             {
-                if (check_bit(pawn_attacks[white][origin], chess_board.enpassant))
+                if (check_bit(pawn_attacks[black][origin], generation_board.enpassant))
                 {
-                    std::cout << "Enpassant" << std::endl;
+                    move_stack.push(create_move(origin, generation_board.enpassant, p, 0, 1, 0, 0, 1));
+                    // Black pawn enpassant
                 }
             }
         }
     }
 }
 
-void ChessEngine::generate_knight_moves(Board generation_board)
+inline void generate_knight_moves(std::stack<int> move_stack, Board generation_board)
 {
     int origin;
     int target;
@@ -370,17 +392,19 @@ void ChessEngine::generate_knight_moves(Board generation_board)
             remove_bit(target_mask, target);
             if (check_bit(generation_board.occupancies[!generation_board.side], target))
             {
-                std::cout << "Knight capture" << std::endl;
+                move_stack.push(create_move(origin, target, (N + 6 * generation_board.side), 0, 1, 0, 0, 0));
+                // Knight capture
             }
             else
             {
-                std::cout << "Knight quiet" << std::endl;
+                move_stack.push(create_move(origin, target, (N + 6 * generation_board.side), 0, 0, 0, 0, 0));
+                // Knight quiet
             }
         }
     }
 }
 
-void ChessEngine::generate_bishop_moves(Board generation_board)
+inline void generate_bishop_moves(std::stack<int> move_stack, Board generation_board)
 {
     int origin;
     int target;
@@ -399,17 +423,19 @@ void ChessEngine::generate_bishop_moves(Board generation_board)
             remove_bit(target_mask, target);
             if (check_bit(generation_board.occupancies[!generation_board.side], target))
             {
-                std::cout << "Bishop Capture" << std::endl;
+                move_stack.push(create_move(origin, target, (B + 6 * generation_board.side), 0, 1, 0, 0, 0));
+                // Bishop capture
             }
             else
             {
-                std::cout << "Bishop Quiet" << std::endl;
+                move_stack.push(create_move(origin, target, (B + 6 * generation_board.side), 0, 0, 0, 0, 0));
+                // Bishop quiet
             }
         }
     }
 }
 
-void ChessEngine::generate_rook_moves(Board generation_board)
+inline void generate_rook_moves(std::stack<int> move_stack, Board generation_board)
 {
     int origin;
     int target;
@@ -428,17 +454,19 @@ void ChessEngine::generate_rook_moves(Board generation_board)
             remove_bit(target_mask, target);
             if (check_bit(generation_board.occupancies[!generation_board.side], target))
             {
-                std::cout << "Rook Capture" << std::endl;
+                move_stack.push(create_move(origin, target, (R + 6 * generation_board.side), 0, 1, 0, 0, 0));
+                // Rook capture
             }
             else
             {
-                std::cout << "Rook Quiet" << std::endl;
+                move_stack.push(create_move(origin, target, (R + 6 * generation_board.side), 0, 0, 0, 0, 0));
+                // Rook quiet
             }
         }
     }
 }
 
-void ChessEngine::generate_queen_moves(Board generation_board)
+inline void generate_queen_moves(std::stack<int> move_stack, Board generation_board)
 {
     int origin;
     int target;
@@ -457,17 +485,19 @@ void ChessEngine::generate_queen_moves(Board generation_board)
             remove_bit(target_mask, target);
             if (check_bit(generation_board.occupancies[!generation_board.side], target))
             {
-                std::cout << "Queen Capture" << std::endl;
+                move_stack.push(create_move(origin, target, (Q + 6 * generation_board.side), 0, 1, 0, 0, 0));
+                // Queen capture
             }
             else
             {
-                std::cout << "Queen Quiet" << std::endl;
+                move_stack.push(create_move(origin, target, (Q + 6 * generation_board.side), 0, 0, 0, 0, 0));
+                // Queen quiet
             }
         }
     }
 }
 
-void ChessEngine::generate_king_moves(Board generation_board)
+inline void generate_king_moves(std::stack<int> move_stack, Board generation_board)
 {
     int origin;
     int target;
@@ -486,17 +516,19 @@ void ChessEngine::generate_king_moves(Board generation_board)
             remove_bit(target_mask, target);
             if (check_bit(generation_board.occupancies[!generation_board.side], target))
             {
-                std::cout << "King Capture" << std::endl;
+                move_stack.push(create_move(origin, target, (K + 6 * generation_board.side), 0, 1, 0, 0, 0));
+                // King capture
             }
             else
             {
-                std::cout << "King Quiet" << std::endl;
+                move_stack.push(create_move(origin, target, (K + 6 * generation_board.side), 0, 0, 0, 0, 0));
+                // King quiet
             }
         }
     }
 }
 
-void ChessEngine::generate_castling_moves(Board generation_board)
+inline void generate_castling_moves(std::stack<int> move_stack, Board generation_board)
 {
     if (generation_board.side == white)
     {
@@ -504,9 +536,10 @@ void ChessEngine::generate_castling_moves(Board generation_board)
         {
             if (check_bit(generation_board.occupancies[neither], f1) && check_bit(generation_board.occupancies[neither], g1))
             {
-                if (!check_if_attacked(generation_board.side, e1) && !check_if_attacked(generation_board.side, f1))
+                if (!check_if_attacked(generation_board, generation_board.side, e1) && !check_if_attacked(generation_board, generation_board.side, f1))
                 {
-                    std::cout << "White side castle" << std::endl;
+                    move_stack.push(create_move(e1, g1, K, 0, 0, 0, 1, 0));
+                    // White King side castle
                 }
             }
         }
@@ -514,9 +547,10 @@ void ChessEngine::generate_castling_moves(Board generation_board)
         {
             if (check_bit(generation_board.occupancies[neither], d1) && check_bit(generation_board.occupancies[neither], c1) && check_bit(generation_board.occupancies[neither], b1))
             {
-                if (!check_if_attacked(generation_board.side, e1) && !check_if_attacked(generation_board.side, d1))
+                if (!check_if_attacked(generation_board, generation_board.side, e1) && !check_if_attacked(generation_board, generation_board.side, d1))
                 {
-                    std::cout << "White queen side castle" << std::endl;
+                    move_stack.push(create_move(e1, c1, K, 0, 0, 0, 1, 0));
+                    // White Queen side castle
                 }
             }
         }
@@ -527,9 +561,10 @@ void ChessEngine::generate_castling_moves(Board generation_board)
         {
             if (check_bit(generation_board.occupancies[neither], f8) && check_bit(generation_board.occupancies[neither], g8))
             {
-                if (!check_if_attacked(generation_board.side, e8) && !check_if_attacked(generation_board.side, f8))
+                if (!check_if_attacked(generation_board, generation_board.side, e8) && !check_if_attacked(generation_board, generation_board.side, f8))
                 {
-                    std::cout << "Black king side castle" << std::endl;
+                    move_stack.push(create_move(e8, g8, k, 0, 0, 0, 1, 0));
+                    // Black King side castle
                 }
             }
         }
@@ -537,23 +572,370 @@ void ChessEngine::generate_castling_moves(Board generation_board)
         {
             if (check_bit(generation_board.occupancies[neither], d8) && check_bit(generation_board.occupancies[neither], c8) && check_bit(generation_board.occupancies[neither], b8))
             {
-                if (!check_if_attacked(generation_board.side, e8) && !check_if_attacked(generation_board.side, d8))
+                if (!check_if_attacked(generation_board, generation_board.side, e8) && !check_if_attacked(generation_board, generation_board.side, d8))
                 {
-                    std::cout << "Black queen side castle" << std::endl;
+                    move_stack.push(create_move(e8, c8, k, 0, 0, 0, 1, 0));
+                    // Black Queen side castle
                 }
             }
         }
     }
 }
+*/
 
 // Possible optimisation: Check if the type of piece is on the board might speed up this function a bit?
 void ChessEngine::generate_moves(Board generation_board)
 {
-    generate_pawn_moves(generation_board);
-    generate_knight_moves(generation_board);
-    generate_bishop_moves(generation_board);
-    generate_rook_moves(generation_board);
-    generate_queen_moves(generation_board);
-    generate_king_moves(generation_board);
-    generate_castling_moves(generation_board);
+    std::stack<int> move_stack;
+    int origin;
+    int target;
+    U64 bitboard;
+    U64 captures;
+    U64 target_mask;
+
+    // ###########
+    // ## Pawns ##
+    // ###########
+
+    if (generation_board.side == white)
+    {
+        bitboard = generation_board.piece_boards[P];
+
+        while (bitboard)
+        {
+            origin = index_least_sig(bitboard);
+            remove_bit(bitboard, origin);
+            target = origin - 8;
+
+            if (check_bit(generation_board.occupancies[neither], target)) // Non - capture moves
+            {
+                if (target <= 7)
+                {
+                    move_stack.push(create_move(origin, target, P, Q, 0, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, P, R, 0, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, P, B, 0, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, P, N, 0, 0, 0, 0));
+                    // White pawn promotion
+                }
+                else
+                {
+                    move_stack.push(create_move(origin, target, P, 0, 0, 0, 0, 0));
+                    // White pawn quiet
+                }
+
+                if (origin >= 48)
+                {
+                    target = origin - 16;
+                    if (check_bit(chess_board.occupancies[neither], target))
+                    {
+                        move_stack.push(create_move(origin, target, P, 0, 0, 1, 0, 0));
+                        // White pawn double
+                    }
+                }
+            }
+
+            captures = pawn_attacks[white][origin] & chess_board.occupancies[black];
+            while (captures) // Capture moves
+            {
+                target = index_least_sig(captures);
+                if (target <= 7)
+                {
+                    move_stack.push(create_move(origin, target, P, Q, 1, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, P, R, 1, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, P, B, 1, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, P, N, 1, 0, 0, 0));
+                    // White pawn promotion capture
+                }
+                else
+                {
+                    move_stack.push(create_move(origin, target, P, 0, 1, 0, 0, 0));
+                    // White pawn capture
+                }
+                remove_bit(captures, target);
+            }
+
+            if (chess_board.enpassant != -1) // Enpassant moves
+            {
+                if (check_bit(pawn_attacks[white][origin], generation_board.enpassant))
+                {
+                    move_stack.push(create_move(origin, target, P, 0, 1, 0, 0, 1));
+                    // White pawn enpassant
+                }
+            }
+        }
+    }
+    else
+    {
+        bitboard = generation_board.piece_boards[p];
+
+        while (bitboard)
+        {
+            origin = index_least_sig(bitboard);
+            remove_bit(bitboard, origin);
+            target = origin + 8;
+
+            if (check_bit(chess_board.occupancies[neither], target))
+            {
+                if (target >= 56)
+                {
+                    move_stack.push(create_move(origin, target, p, q, 0, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, p, r, 0, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, p, b, 0, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, p, n, 0, 0, 0, 0));
+                    // Black pawn promotion
+                }
+                else
+                {
+                    move_stack.push(create_move(origin, target, p, 0, 0, 0, 0, 0));
+                    // Black pawn quiet
+                }
+
+                if (origin <= 15)
+                {
+                    target = origin + 16;
+                    if (check_bit(chess_board.occupancies[neither], target))
+                    {
+                        move_stack.push(create_move(origin, target, p, 0, 0, 1, 0, 0));
+                        // Black pawn double
+                    }
+                }
+            }
+
+            captures = pawn_attacks[black][origin] & chess_board.occupancies[white];
+            while (captures)
+            {
+                target = index_least_sig(captures);
+                if (target >= 56) // White's home row
+                {
+                    move_stack.push(create_move(origin, target, p, q, 1, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, p, r, 1, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, p, b, 1, 0, 0, 0));
+                    move_stack.push(create_move(origin, target, p, n, 1, 0, 0, 0));
+                    // Black pawn promotion capture
+                }
+                else
+                {
+                    move_stack.push(create_move(origin, target, p, 0, 1, 0, 0, 0));
+                    // Black pawn capture
+                }
+                remove_bit(captures, target);
+            }
+
+            if (chess_board.enpassant != -1) // Enpassant moves
+            {
+                if (check_bit(pawn_attacks[black][origin], generation_board.enpassant))
+                {
+                    move_stack.push(create_move(origin, generation_board.enpassant, p, 0, 1, 0, 0, 1));
+                    // Black pawn enpassant
+                }
+            }
+        }
+    }
+
+    // #############
+    // ## Knights ##
+    // #############
+
+    bitboard = generation_board.piece_boards[generation_board.side ? n : N];
+
+    while (bitboard)
+    {
+        origin = index_least_sig(bitboard);
+        remove_bit(bitboard, origin);
+        target_mask = knight_attacks[origin] & ~generation_board.occupancies[generation_board.side];
+
+        while (target_mask)
+        {
+            target = index_least_sig(target_mask);
+            remove_bit(target_mask, target);
+            if (check_bit(generation_board.occupancies[!generation_board.side], target))
+            {
+                move_stack.push(create_move(origin, target, (N + (6 * generation_board.side)), 0, 1, 0, 0, 0));
+                // Knight capture
+            }
+            else
+            {
+                move_stack.push(create_move(origin, target, (N + (6 * generation_board.side)), 0, 0, 0, 0, 0));
+                // Knight quiet
+            }
+        }
+    }
+
+    // #############
+    // ## Bishops ##
+    // #############
+
+    bitboard = generation_board.piece_boards[generation_board.side ? b : B];
+
+    while (bitboard)
+    {
+        origin = index_least_sig(bitboard);
+        remove_bit(bitboard, origin);
+        target_mask = magic.get_bishop(origin, generation_board.occupancies[all]) & ~generation_board.occupancies[generation_board.side];
+
+        while (target_mask)
+        {
+            target = index_least_sig(target_mask);
+            remove_bit(target_mask, target);
+            if (check_bit(generation_board.occupancies[!generation_board.side], target))
+            {
+                move_stack.push(create_move(origin, target, (B + 6 * generation_board.side), 0, 1, 0, 0, 0));
+                // Bishop capture
+            }
+            else
+            {
+                move_stack.push(create_move(origin, target, (B + 6 * generation_board.side), 0, 0, 0, 0, 0));
+                // Bishop quiet
+            }
+        }
+    }
+
+    // ###########
+    // ## Rooks ##
+    // ###########
+
+    bitboard = generation_board.piece_boards[generation_board.side ? r : R];
+
+    while (bitboard)
+    {
+        origin = index_least_sig(bitboard);
+        remove_bit(bitboard, origin);
+        target_mask = magic.get_rook(origin, generation_board.occupancies[all]) & ~generation_board.occupancies[generation_board.side];
+
+        while (target_mask)
+        {
+            target = index_least_sig(target_mask);
+            remove_bit(target_mask, target);
+            if (check_bit(generation_board.occupancies[!generation_board.side], target))
+            {
+                move_stack.push(create_move(origin, target, (R + 6 * generation_board.side), 0, 1, 0, 0, 0));
+                // Rook capture
+            }
+            else
+            {
+                move_stack.push(create_move(origin, target, (R + 6 * generation_board.side), 0, 0, 0, 0, 0));
+                // Rook quiet
+            }
+        }
+    }
+
+    // ############
+    // ## Queens ##
+    // ############
+
+    bitboard = generation_board.piece_boards[generation_board.side ? q : Q];
+
+    while (bitboard)
+    {
+        origin = index_least_sig(bitboard);
+        remove_bit(bitboard, origin);
+        target_mask = magic.get_queen(origin, generation_board.occupancies[all]) & ~generation_board.occupancies[generation_board.side];
+
+        while (target_mask)
+        {
+            target = index_least_sig(target_mask);
+            remove_bit(target_mask, target);
+            if (check_bit(generation_board.occupancies[!generation_board.side], target))
+            {
+                move_stack.push(create_move(origin, target, (Q + 6 * generation_board.side), 0, 1, 0, 0, 0));
+                // Queen capture
+            }
+            else
+            {
+                move_stack.push(create_move(origin, target, (Q + 6 * generation_board.side), 0, 0, 0, 0, 0));
+                // Queen quiet
+            }
+        }
+    }
+
+    // ###########
+    // ## Kings ##
+    // ###########
+
+    bitboard = generation_board.piece_boards[generation_board.side ? k : K];
+
+    while (bitboard)
+    {
+        origin = index_least_sig(bitboard);
+        remove_bit(bitboard, origin);
+        target_mask = king_attacks[origin] & ~generation_board.occupancies[generation_board.side];
+
+        while (target_mask)
+        {
+            target = index_least_sig(target_mask);
+            remove_bit(target_mask, target);
+            if (check_bit(generation_board.occupancies[!generation_board.side], target))
+            {
+                move_stack.push(create_move(origin, target, (K + 6 * generation_board.side), 0, 1, 0, 0, 0));
+                // King capture
+            }
+            else
+            {
+                move_stack.push(create_move(origin, target, (K + 6 * generation_board.side), 0, 0, 0, 0, 0));
+                // King quiet
+            }
+        }
+    }
+
+    // ##############
+    // ## Castling ##
+    // ##############
+
+    if (generation_board.side == white)
+    {
+        if (generation_board.castle & wk)
+        {
+            if (check_bit(generation_board.occupancies[neither], f1) && check_bit(generation_board.occupancies[neither], g1))
+            {
+                if (!check_if_attacked(generation_board, generation_board.side, e1) && !check_if_attacked(generation_board, generation_board.side, f1))
+                {
+                    move_stack.push(create_move(e1, g1, K, 0, 0, 0, 1, 0));
+                    // White King side castle
+                }
+            }
+        }
+        if (generation_board.castle & wq)
+        {
+            if (check_bit(generation_board.occupancies[neither], d1) && check_bit(generation_board.occupancies[neither], c1) && check_bit(generation_board.occupancies[neither], b1))
+            {
+                if (!check_if_attacked(generation_board, generation_board.side, e1) && !check_if_attacked(generation_board, generation_board.side, d1))
+                {
+                    move_stack.push(create_move(e1, c1, K, 0, 0, 0, 1, 0));
+                    // White Queen side castle
+                }
+            }
+        }
+    }
+    else
+    {
+        if (generation_board.castle & bk)
+        {
+            if (check_bit(generation_board.occupancies[neither], f8) && check_bit(generation_board.occupancies[neither], g8))
+            {
+                if (!check_if_attacked(generation_board, generation_board.side, e8) && !check_if_attacked(generation_board, generation_board.side, f8))
+                {
+                    move_stack.push(create_move(e8, g8, k, 0, 0, 0, 1, 0));
+                    // Black King side castle
+                }
+            }
+        }
+        if (generation_board.castle & bq)
+        {
+            if (check_bit(generation_board.occupancies[neither], d8) && check_bit(generation_board.occupancies[neither], c8) && check_bit(generation_board.occupancies[neither], b8))
+            {
+                if (!check_if_attacked(generation_board, generation_board.side, e8) && !check_if_attacked(generation_board, generation_board.side, d8))
+                {
+                    move_stack.push(create_move(e8, c8, k, 0, 0, 0, 1, 0));
+                    // Black Queen side castle
+                }
+            }
+        }
+    }
+
+    std::cout << "Moves generated: " << move_stack.size() << std::endl;
+    for (int i = move_stack.size(); i > 0; i--)
+    {
+        print_move(move_stack.top());
+        move_stack.pop();
+    }
 }
