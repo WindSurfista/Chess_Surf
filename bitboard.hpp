@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string>
 #include <iostream>
+#include <memory.h>
 
 #define U64 unsigned long long
 #define check_bit(bitboard, index) ((bitboard >> index) & 1U)
@@ -26,11 +27,37 @@ a2,b2,c2,d2,e2,f2,g2,h2,
 a1,b1,c1,d1,e1,f1,g1,h1
 };
 
+enum {white, black, all, neither};
+
+enum {P, N, B, R, Q, K, p, n, b, r, q, k}; // Capital - White pieces, Lower - Black pieces
+
+enum {wk = 1, wq = 2, bk = 4, bq = 8}; // Castling encoding
+
+struct Board
+{
+    bool side = white;
+    int enpassant = -1;
+    int castle = 0;
+    U64 piece_boards[12] = {};
+    U64 occupancies[4] = {};
+
+    Board(const Board& chess_board)
+    {
+        side = chess_board.side;
+        enpassant = chess_board.enpassant;
+        castle = chess_board.castle;
+        memcpy(piece_boards, chess_board.piece_boards, sizeof(chess_board.piece_boards));
+        memcpy(occupancies, chess_board.occupancies, sizeof(chess_board.occupancies));
+    }
+
+    Board() = default;
+};
+
 
 
 void print_bitboard(U64);
 
-inline static int hamming_weight(U64 bitboard)
+inline int hamming_weight(U64 bitboard)
 {
     int count = 0;
     while (bitboard)
@@ -57,3 +84,4 @@ inline static int index_least_sig(U64 bitboard)
     }
     return -1; // Empty bitboard error code
 }
+
