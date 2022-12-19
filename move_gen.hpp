@@ -1,8 +1,20 @@
 #pragma once
-#include "bitboard.hpp"
+#include "representation.hpp"
 
-class MagicMove
+class MoveGen
 {
+    private:
+    // Leaper pieces
+    U64 pawn_masks[2][64];
+    U64 knight_masks[64];
+    U64 king_masks[64];
+
+    U64 pawn_mask(int color, int index);
+    U64 knight_mask(int index);
+    U64 king_mask(int index);
+
+
+    // Slider pieces
     U64 bishop_masks[64];
     U64 rook_masks[64];
 
@@ -15,7 +27,8 @@ class MagicMove
     U64 *bishop_htable[64];
     U64 *rook_htable[64];
 
-    private:
+    void init_leaper_masks();
+    
     // Piece_mask: A bitboard of a piece's movement pattern on a blank board
     void init_bishop_masks();
     void init_rook_masks();
@@ -33,7 +46,11 @@ class MagicMove
     void init_bishop_magic();
 
     public:
-    MagicMove();
+    MoveGen();
+    U64 get_pawn(int color, int index);
+    U64 get_knight(int index);
+    U64 get_king(int index);
+
     U64 get_bishop(int index, U64 occupancy);
     U64 get_rook(int index, U64 occupancy);
     U64 get_queen(int index, U64 occupancy);

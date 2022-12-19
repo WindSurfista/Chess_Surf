@@ -1,5 +1,4 @@
 #include <iostream>
-#include "../attacks.hpp"
 #include <string>
 #include <math.h>
 
@@ -22,15 +21,10 @@ class thing
     void dis() {std::cout << x << std::endl;}
 };
 
-
-int main()
+int main(int argc, char** argv)
 {
-    thing foo;
-    foo.func(10);
-    thing bar(foo);
-
-    bar.func(2);
-    foo = bar;
-    foo.dis();
-    bar.dis();
+    std::cout << "You have entered " << argc << " arguments:" << "\n";
+    for (int i = 0; i < argc; ++i)
+    std::cout << argv[i] << "\n";
+    return 0;
 }

@@ -1,5 +1,5 @@
 #pragma once
-#include "bitboard.hpp"
+#include "representation.hpp"
 #include <stack>
 
 // might be better to handle moves as a struct
@@ -16,14 +16,14 @@
 #define move_enpassant_flag(move) ((move & 0x800000) >> 23)
 
 /*
-1 0 0 0 0000 0000 000000 000000                enpassant_flag
-0 1 0 0 0000 0000 000000 000000                castling_flag
-0 0 1 0 0000 0000 000000 000000                double_flag
-0 0 0 1 0000 0000 000000 000000                capture_flag
-0 0 0 0 1111 0000 000000 000000                promotion_piece
-0 0 0 0 0000 1111 000000 000000                piece
-0 0 0 0 0000 0000 111111 000000                target
-0 0 0 0 0000 0000 000000 111111                origin
+1 0 0 0 0000 0000 000000 000000            enpassant_flag
+0 1 0 0 0000 0000 000000 000000            castling_flag
+0 0 1 0 0000 0000 000000 000000            double_flag
+0 0 0 1 0000 0000 000000 000000            capture_flag
+0 0 0 0 1111 0000 000000 000000            promotion_piece
+0 0 0 0 0000 1111 000000 000000            piece
+0 0 0 0 0000 0000 111111 000000            target
+0 0 0 0 0000 0000 000000 111111            origin
 
 1 1 1 1 0100 0110 111111 100100
 */

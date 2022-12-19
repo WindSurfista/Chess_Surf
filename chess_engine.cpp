@@ -3,7 +3,7 @@
 #include "chess_engine.hpp"
 #include "move.hpp"
 
-const int castling_rights[64] = {
+const int castling_rights[64] = { // Ask lomax if this should be moved inside the chess engine class
     7, 15, 15, 15,  3, 15, 15, 11,
     15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15,
@@ -18,7 +18,7 @@ void ChessEngine::load_FEN(char *FEN)
 {
     memset(chess_board.occupancies, 0, sizeof(chess_board.occupancies));
     memset(chess_board.piece_boards, 0, sizeof(chess_board.piece_boards));
-    chess_board.castle = 0;
+    chess_board.castle_rights = 0;
 
     // Reads board state
     std::string piece_string = "PNBRQKpnbrqk";
@@ -52,19 +52,19 @@ void ChessEngine::load_FEN(char *FEN)
         switch (*FEN)
         {
         case 'K':
-            chess_board.castle += wk;
+            chess_board.castle_rights += wk;
             break;
 
         case 'Q':
-            chess_board.castle += wq;
+            chess_board.castle_rights += wq;
             break;
 
         case 'k':
-            chess_board.castle += bk;
+            chess_board.castle_rights += bk;
             break;
 
         case 'q':
-            chess_board.castle += bq;
+            chess_board.castle_rights += bq;
             break;
         }
         FEN++;
@@ -104,13 +104,13 @@ void print_chessboard(Board chess_board)
     std::cout << std::endl;
     std::cout << "Side to move: " << (chess_board.side ? "Black" : "White") << std::endl;
     std::cout << "Castling rights: ";
-    if check_bit (chess_board.castle, 0)
+    if check_bit (chess_board.castle_rights, 0)
         std::cout << 'K';
-    if check_bit (chess_board.castle, 1)
+    if check_bit (chess_board.castle_rights, 1)
         std::cout << 'Q';
-    if check_bit (chess_board.castle, 2)
+    if check_bit (chess_board.castle_rights, 2)
         std::cout << 'k';
-    if check_bit (chess_board.castle, 3)
+    if check_bit (chess_board.castle_rights, 3)
         std::cout << 'q';
     std::cout << std::endl;
 
@@ -126,121 +126,141 @@ void print_chessboard(Board chess_board)
     }
 }
 
-U64 ChessEngine::pawn_mask(int color, int index)
+ChessEngine::ChessEngine(int search_depth)
 {
-    U64 bitmask = 0ULL;
-    U64 bitboard = 0ULL;
-    set_bit(bitboard, index);
+    default_search_depth = search_depth;
 
-    if (color == white)
+    int mg_material_value[12] = {82, 337, 365, 477, 1025, 9999, 82, 337, 365, 477, 1025, 9999};
+    int eg_material_value[12] = {94, 281, 297, 512, 936, 9999, 94, 281, 297, 512, 936, 9999};
+
+    int pawn_table[64] = {
+         0,  0,  0,  0,  0,  0,  0,  0,
+        50, 50, 50, 50, 50, 50, 50, 50,
+        10, 10, 20, 30, 30, 20, 10, 10,
+         5,  5, 10, 25, 25, 10,  5,  5,
+         0,  0,  0, 20, 20,  0,  0,  0,
+         5, -5,-10,  0,  0,-10, -5,  5,
+         5, 10, 10,-20,-20, 10, 10,  5,
+         0,  0,  0,  0,  0,  0,  0,  0
+    };
+
+    int knight_table[64] = {
+        -50,-40,-30,-30,-30,-30,-40,-50,
+        -40,-20,  0,  0,  0,  0,-20,-40,
+        -30,  0, 10, 15, 15, 10,  0,-30,
+        -30,  5, 15, 20, 20, 15,  5,-30,
+        -30,  0, 15, 20, 20, 15,  0,-30,
+        -30,  5, 10, 15, 15, 10,  5,-30,
+        -40,-20,  0,  5,  5,  0,-20,-40,
+        -50,-40,-30,-30,-30,-30,-40,-50,
+    };
+
+    int bishop_table[64] = {
+        -20,-10,-10,-10,-10,-10,-10,-20,
+        -10,  0,  0,  0,  0,  0,  0,-10,
+        -10,  0,  5, 10, 10,  5,  0,-10,
+        -10,  5,  5, 10, 10,  5,  5,-10,
+        -10,  0, 10, 10, 10, 10,  0,-10,
+        -10, 10, 10, 10, 10, 10, 10,-10,
+        -10,  5,  0,  0,  0,  0,  5,-10,
+        -20,-10,-10,-10,-10,-10,-10,-20,
+    };
+
+    int rook_table[64] = {
+         0,  0,  0,  0,  0,  0,  0,  0,
+         5, 10, 10, 10, 10, 10, 10,  5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+         0,  0,  0,  5,  5,  0,  0,  0
+    };
+
+    int queen_table[64] = {
+        -20,-10,-10, -5, -5,-10,-10,-20,
+        -10,  0,  0,  0,  0,  0,  0,-10,
+        -10,  0,  5,  5,  5,  5,  0,-10,
+         -5,  0,  5,  5,  5,  5,  0, -5,
+          0,  0,  5,  5,  5,  5,  0, -5,
+        -10,  5,  5,  5,  5,  5,  0,-10,
+        -10,  0,  5,  0,  0,  0,  0,-10,
+        -20,-10,-10, -5, -5,-10,-10,-20
+    };
+
+    int mg_king_table[64] = {
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -20,-30,-30,-40,-40,-30,-30,-20,
+        -10,-20,-20,-20,-20,-20,-20,-10,
+         20, 20,  0,  0,  0,  0, 20, 20,
+         20, 30, 10,  0,  0, 10, 30, 20
+    };
+
+    int eg_king_table[64] = {
+        -50,-40,-30,-20,-20,-30,-40,-50,
+        -30,-20,-10,  0,  0,-10,-20,-30,
+        -30,-10, 20, 30, 30, 20,-10,-30,
+        -30,-10, 30, 40, 40, 30,-10,-30,
+        -30,-10, 30, 40, 40, 30,-10,-30,
+        -30,-10, 20, 30, 30, 20,-10,-30,
+        -30,-30,  0,  0,  0,  0,-30,-30,
+        -50,-30,-30,-30,-30,-30,-30,-50
+    };
+
+    int* mg_pos_tables[12] ={
+        pawn_table,
+        knight_table,
+        bishop_table,
+        rook_table,
+        queen_table,
+        mg_king_table,
+        pawn_table,
+        knight_table,
+        bishop_table,
+        rook_table,
+        queen_table,
+        mg_king_table
+    };
+
+    int* eg_pos_tables[12] ={
+        pawn_table,
+        knight_table,
+        bishop_table,
+        rook_table,
+        queen_table,
+        eg_king_table,
+        pawn_table,
+        knight_table,
+        bishop_table,
+        rook_table,
+        queen_table,
+        eg_king_table
+    };
+
+    for (int piece = 0; piece < 6; piece++)
     {
-        if (check_bit(no_a_file, index))
+        for (int index = 0; index < 64; index++)
         {
-            bitmask |= bitboard >> 9;
+            mg_table[piece][index] = mg_pos_tables[piece][index] + mg_material_value[piece];
+            eg_table[piece][index] = eg_pos_tables[piece][index] + eg_material_value[piece];
         }
-        if (check_bit(no_h_file, index))
-        {
-            bitmask |= bitboard >> 7;
-        }
-        return bitmask;
     }
-    else
+    for (int piece = 6; piece < 12; piece++)
     {
-        if (check_bit(no_a_file, index))
+        for (int index = 0; index < 64; index++)
         {
-            bitmask |= bitboard << 7;
+            mg_table[piece][index] = mg_pos_tables[piece][index^56] + mg_material_value[piece]; // Flips "^56" flips the index to the other side of the board
+            eg_table[piece][index] = eg_pos_tables[piece][index^56] + eg_material_value[piece];
         }
-        if (check_bit(no_h_file, index))
-        {
-            bitmask |= bitboard << 9;
-        }
-        return bitmask;
     }
 }
-
-U64 ChessEngine::knight_mask(int index)
-{
-    U64 attacks = 0ULL;
-    U64 bitboard = 0ULL;
-    set_bit(bitboard, index);
-
-    if (check_bit(no_a_file, index))
-    {
-        attacks |= bitboard << 15;
-        attacks |= bitboard >> 17;
-    }
-
-    if (check_bit(no_ab_file, index))
-    {
-        attacks |= bitboard << 6;
-        attacks |= bitboard >> 10;
-    }
-
-    if (check_bit(no_h_file, index))
-    {
-        attacks |= bitboard << 17;
-        attacks |= bitboard >> 15;
-    }
-
-    if (check_bit(no_gh_file, index))
-    {
-        attacks |= bitboard << 10;
-        attacks |= bitboard >> 6;
-    }
-    return attacks;
-}
-
-U64 ChessEngine::king_mask(int index)
-{
-    U64 attacks = 0ULL;
-    U64 bitboard = 0ULL;
-    set_bit(bitboard, index);
-
-    if (check_bit(no_h_file, index))
-    {
-        attacks |= bitboard << 9;
-        attacks |= bitboard << 1;
-        attacks |= bitboard >> 7;
-    }
-
-    if (check_bit(no_a_file, index))
-    {
-        attacks |= bitboard << 7;
-        attacks |= bitboard >> 1;
-        attacks |= bitboard >> 9;
-    }
-    attacks |= bitboard << 8;
-    attacks |= bitboard >> 8;
-
-    return attacks;
-}
-
-ChessEngine::ChessEngine()
-{
-    for (int index = 0; index < 64; index++)
-    {
-        pawn_attacks[white][index] = pawn_mask(white, index);
-        pawn_attacks[black][index] = pawn_mask(black, index);
-
-        knight_attacks[index] = knight_mask(index);
-
-        king_attacks[index] = king_mask(index);
-    }
-
-    init_tables(); // Calculates position value tables used during evaluation
-}
-
-char piece_to_char[] = {'p','n','b','r','q','k','p','n','b','r','q','k'};
-std::map<char, int> char_to_piece = {
-    {'p', 0},
-    {'n', 1},
-    {'b', 2},
-    {'r', 3},
-    {'q', 4}
-};
 
 void ChessEngine::UCI_send_move(int move)
 {
+    char piece_to_char[] = {'p','n','b','r','q','k','p','n','b','r','q','k'};
     if (move_promotion(move))
         printf("bestmove %s%s%c\n", index_to_square[move_origin(move)],
                            index_to_square[move_target(move)],
@@ -252,12 +272,20 @@ void ChessEngine::UCI_send_move(int move)
 
 int ChessEngine::UCI_get_move(char* command_ptr)
 {
+    std::map<char, int> char_to_piece = {
+    {'p', 0},
+    {'n', 1},
+    {'b', 2},
+    {'r', 3},
+    {'q', 4}
+    };
+
     int origin = (command_ptr[0] - 'a') + (8 - (command_ptr[1] - '0')) * 8;
     int target = (command_ptr[2] - 'a') + (8 - (command_ptr[3] - '0')) * 8;
     int promotion = ((command_ptr[4] == ' ') | (command_ptr[4] == '\0'))? 0 : (char_to_piece[command_ptr[4]] + 6*chess_board.side);
 
     std::stack<int> move_stack;
-    generate_moves(&move_stack);
+    find_moves(&move_stack);
     int move;
     while (!move_stack.empty())
     {
@@ -340,6 +368,7 @@ void ChessEngine::UCI_main_loop()
     {
         memset(command,0,5000);
         std::cin.getline(command, sizeof(command));
+
         if (command[0] == '\n') continue;
 
         if (strncmp(command, "isready", 7) == 0)
@@ -379,23 +408,23 @@ void ChessEngine::UCI_main_loop()
 // Possible optimisation: Maintain an incrementally updated attacked squares bitboard in the chess board struct is updated with each move.
 bool ChessEngine::check_if_attacked(int index) // Checks if a square is dangerous for the current side
 {
-    if (pawn_attacks[chess_board.side][index] & chess_board.piece_boards[p - 6 * chess_board.side])
+    if (move_gen.get_pawn(chess_board.side,index) & chess_board.piece_boards[p - 6 * chess_board.side])
         return true;
-    if (knight_attacks[index] & chess_board.piece_boards[n - 6 * chess_board.side])
+    if (move_gen.get_knight(index) & chess_board.piece_boards[n - 6 * chess_board.side])
         return true;
-    if (slide_move_gen.get_bishop(index, chess_board.occupancies[all]) & chess_board.piece_boards[b - 6 * chess_board.side])
+    if (move_gen.get_bishop(index, chess_board.occupancies[all]) & chess_board.piece_boards[b - 6 * chess_board.side])
         return true;
-    if (slide_move_gen.get_rook(index, chess_board.occupancies[all]) & chess_board.piece_boards[r - 6 * chess_board.side])
+    if (move_gen.get_rook(index, chess_board.occupancies[all]) & chess_board.piece_boards[r - 6 * chess_board.side])
         return true;
-    if (slide_move_gen.get_queen(index, chess_board.occupancies[all]) & chess_board.piece_boards[q - 6 * chess_board.side])
+    if (move_gen.get_queen(index, chess_board.occupancies[all]) & chess_board.piece_boards[q - 6 * chess_board.side])
         return true;
-    if (king_attacks[index] & chess_board.piece_boards[k - 6 * chess_board.side])
+    if (move_gen.get_king(index) & chess_board.piece_boards[k - 6 * chess_board.side])
         return true;
     return false;
 }
 
 // Possible optimisation: Check if the type of piece is on the board might speed up this function a bit?
-void ChessEngine::generate_moves(std::stack<int>* move_stack)
+void ChessEngine::find_moves(std::stack<int>* move_stack)
 {
     while (!move_stack->empty()) move_stack->pop();
 
@@ -416,7 +445,7 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
         while (bitboard)
         {
             origin = index_least_sig(bitboard);
-            remove_bit(bitboard, origin);
+            clear_bit(bitboard, origin);
             target = origin - 8;
 
             if (check_bit(chess_board.occupancies[neither], target)) // Non - capture moves
@@ -446,7 +475,7 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
                 }
             }
 
-            captures = pawn_attacks[white][origin] & chess_board.occupancies[black];
+            captures = move_gen.get_pawn(white, origin) & chess_board.occupancies[black];
             while (captures) // Capture moves
             {
                 target = index_least_sig(captures);
@@ -463,12 +492,12 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
                     move_stack->push(create_move(origin, target, P, 0, 1, 0, 0, 0));
                     // White pawn capture
                 }
-                remove_bit(captures, target);
+                clear_bit(captures, target);
             }
 
             if (chess_board.enpassant != -1) // Enpassant moves
             {
-                if (check_bit(pawn_attacks[white][origin], chess_board.enpassant))
+                if (check_bit(move_gen.get_pawn(white, origin), chess_board.enpassant))
                 {
                     move_stack->push(create_move(origin, chess_board.enpassant, P, 0, 1, 0, 0, 1));
                     // White pawn enpassant
@@ -483,7 +512,7 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
         while (bitboard)
         {
             origin = index_least_sig(bitboard);
-            remove_bit(bitboard, origin);
+            clear_bit(bitboard, origin);
             target = origin + 8;
 
             if (check_bit(chess_board.occupancies[neither], target))
@@ -513,7 +542,7 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
                 }
             }
 
-            captures = pawn_attacks[black][origin] & chess_board.occupancies[white];
+            captures = move_gen.get_pawn(black, origin) & chess_board.occupancies[white];
             while (captures)
             {
                 target = index_least_sig(captures);
@@ -530,12 +559,12 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
                     move_stack->push(create_move(origin, target, p, 0, 1, 0, 0, 0));
                     // Black pawn capture
                 }
-                remove_bit(captures, target);
+                clear_bit(captures, target);
             }
 
             if (chess_board.enpassant != -1) // Enpassant moves
             {
-                if (check_bit(pawn_attacks[black][origin], chess_board.enpassant))
+                if (check_bit(move_gen.get_pawn(black, origin), chess_board.enpassant))
                 {
                     move_stack->push(create_move(origin, chess_board.enpassant, p, 0, 1, 0, 0, 1));
                     // Black pawn enpassant
@@ -553,13 +582,13 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
     while (bitboard)
     {
         origin = index_least_sig(bitboard);
-        remove_bit(bitboard, origin);
-        target_mask = knight_attacks[origin] & ~chess_board.occupancies[chess_board.side];
+        clear_bit(bitboard, origin);
+        target_mask = move_gen.get_knight(origin) & ~chess_board.occupancies[chess_board.side];
 
         while (target_mask)
         {
             target = index_least_sig(target_mask);
-            remove_bit(target_mask, target);
+            clear_bit(target_mask, target);
             if (check_bit(chess_board.occupancies[!chess_board.side], target))
             {
                 move_stack->push(create_move(origin, target, (N + (6 * chess_board.side)), 0, 1, 0, 0, 0));
@@ -582,13 +611,13 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
     while (bitboard)
     {
         origin = index_least_sig(bitboard);
-        remove_bit(bitboard, origin);
-        target_mask = slide_move_gen.get_bishop(origin, chess_board.occupancies[all]) & ~chess_board.occupancies[chess_board.side];
+        clear_bit(bitboard, origin);
+        target_mask = move_gen.get_bishop(origin, chess_board.occupancies[all]) & ~chess_board.occupancies[chess_board.side];
 
         while (target_mask)
         {
             target = index_least_sig(target_mask);
-            remove_bit(target_mask, target);
+            clear_bit(target_mask, target);
             if (check_bit(chess_board.occupancies[!chess_board.side], target))
             {
                 move_stack->push(create_move(origin, target, (B + 6 * chess_board.side), 0, 1, 0, 0, 0));
@@ -611,13 +640,13 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
     while (bitboard)
     {
         origin = index_least_sig(bitboard);
-        remove_bit(bitboard, origin);
-        target_mask = slide_move_gen.get_rook(origin, chess_board.occupancies[all]) & ~chess_board.occupancies[chess_board.side];
+        clear_bit(bitboard, origin);
+        target_mask = move_gen.get_rook(origin, chess_board.occupancies[all]) & ~chess_board.occupancies[chess_board.side];
 
         while (target_mask)
         {
             target = index_least_sig(target_mask);
-            remove_bit(target_mask, target);
+            clear_bit(target_mask, target);
             if (check_bit(chess_board.occupancies[!chess_board.side], target))
             {
                 move_stack->push(create_move(origin, target, (R + 6 * chess_board.side), 0, 1, 0, 0, 0));
@@ -640,13 +669,13 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
     while (bitboard)
     {
         origin = index_least_sig(bitboard);
-        remove_bit(bitboard, origin);
-        target_mask = slide_move_gen.get_queen(origin, chess_board.occupancies[all]) & ~chess_board.occupancies[chess_board.side];
+        clear_bit(bitboard, origin);
+        target_mask = move_gen.get_queen(origin, chess_board.occupancies[all]) & ~chess_board.occupancies[chess_board.side];
 
         while (target_mask)
         {
             target = index_least_sig(target_mask);
-            remove_bit(target_mask, target);
+            clear_bit(target_mask, target);
             if (check_bit(chess_board.occupancies[!chess_board.side], target))
             {
                 move_stack->push(create_move(origin, target, (Q + 6 * chess_board.side), 0, 1, 0, 0, 0));
@@ -669,13 +698,13 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
     while (bitboard)
     {
         origin = index_least_sig(bitboard);
-        remove_bit(bitboard, origin);
-        target_mask = king_attacks[origin] & ~chess_board.occupancies[chess_board.side];
+        clear_bit(bitboard, origin);
+        target_mask = move_gen.get_king(origin) & ~chess_board.occupancies[chess_board.side];
 
         while (target_mask)
         {
             target = index_least_sig(target_mask);
-            remove_bit(target_mask, target);
+            clear_bit(target_mask, target);
             if (check_bit(chess_board.occupancies[!chess_board.side], target))
             {
                 move_stack->push(create_move(origin, target, (K + 6 * chess_board.side), 0, 1, 0, 0, 0));
@@ -695,7 +724,7 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
 
     if (chess_board.side == white)
     {
-        if (chess_board.castle & wk)
+        if (chess_board.castle_rights & wk)
         {
             if (check_bit(chess_board.occupancies[neither], f1) && check_bit(chess_board.occupancies[neither], g1))
             {
@@ -706,7 +735,7 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
                 }
             }
         }
-        if (chess_board.castle & wq)
+        if (chess_board.castle_rights & wq)
         {
             if (check_bit(chess_board.occupancies[neither], d1) && check_bit(chess_board.occupancies[neither], c1) && check_bit(chess_board.occupancies[neither], b1))
             {
@@ -720,7 +749,7 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
     }
     else
     {
-        if (chess_board.castle & bk)
+        if (chess_board.castle_rights & bk)
         {
             if (check_bit(chess_board.occupancies[neither], f8) && check_bit(chess_board.occupancies[neither], g8))
             {
@@ -731,7 +760,7 @@ void ChessEngine::generate_moves(std::stack<int>* move_stack)
                 }
             }
         }
-        if (chess_board.castle & bq)
+        if (chess_board.castle_rights & bq)
         {
             if (check_bit(chess_board.occupancies[neither], d8) && check_bit(chess_board.occupancies[neither], c8) && check_bit(chess_board.occupancies[neither], b8))
             {
@@ -759,18 +788,11 @@ bool ChessEngine::make_move(int move)
     set_bit(chess_board.piece_boards[piece], target); // Place piece on target square
     set_bit(chess_board.occupancies[chess_board.side], target);
 
-    remove_bit(chess_board.occupancies[chess_board.side], origin); // Remove piece from origin square
-    remove_bit(chess_board.piece_boards[piece], origin);
+    clear_bit(chess_board.occupancies[chess_board.side], origin); // Remove piece from origin square
+    clear_bit(chess_board.piece_boards[piece], origin);
 
-    int castle = chess_board.castle;
-
-    chess_board.castle &= castling_rights[target];
-    chess_board.castle &= castling_rights[origin];
-
-    if (!(chess_board.castle == castle))
-    {
-        std::cout << "THing" << std::endl;
-    }
+    chess_board.castle_rights &= castling_rights[target];
+    chess_board.castle_rights &= castling_rights[origin];
 
     int start = chess_board.side ? 0:6; // Determines whether you should iterate through the pieces starting from the white or black pieces
     int capture;
@@ -786,8 +808,8 @@ bool ChessEngine::make_move(int move)
         {
             if (check_bit(chess_board.piece_boards[capture], target))
             {
-                remove_bit(chess_board.piece_boards[capture], target); // Remove captured piece
-                remove_bit(chess_board.occupancies[!chess_board.side], target);
+                clear_bit(chess_board.piece_boards[capture], target); // Remove captured piece
+                clear_bit(chess_board.occupancies[!chess_board.side], target);
                 break;
             }
         }
@@ -795,8 +817,8 @@ bool ChessEngine::make_move(int move)
 
     if (promotion_piece)
     {
-        remove_bit(chess_board.piece_boards[start], target); // The start variable is equal to the correct pawn colour so I can just repurpose it
-        remove_bit(chess_board.occupancies[chess_board.side], target); // Removes the pawn that was just moved
+        clear_bit(chess_board.piece_boards[start], target); // The start variable is equal to the correct pawn colour so I can just repurpose it
+        clear_bit(chess_board.occupancies[chess_board.side], target); // Removes the pawn that was just moved
 
         set_bit(chess_board.piece_boards[promotion_piece], target); // Places the promotion piece in place of the pawn
         set_bit(chess_board.occupancies[chess_board.side], target);
@@ -819,24 +841,24 @@ bool ChessEngine::make_move(int move)
             set_bit(chess_board.piece_boards[R], f1);
             set_bit(chess_board.occupancies[white], f1);
             
-            remove_bit(chess_board.piece_boards[R], h1);
-            remove_bit(chess_board.occupancies[white], h1);
+            clear_bit(chess_board.piece_boards[R], h1);
+            clear_bit(chess_board.occupancies[white], h1);
             break;
         
         case c1:
             set_bit(chess_board.piece_boards[R], d1);
             set_bit(chess_board.occupancies[white], d1);
             
-            remove_bit(chess_board.piece_boards[R], a1);
-            remove_bit(chess_board.occupancies[white], a1);
+            clear_bit(chess_board.piece_boards[R], a1);
+            clear_bit(chess_board.occupancies[white], a1);
             break;
 
         case g8:
             set_bit(chess_board.piece_boards[r], f8);
             set_bit(chess_board.occupancies[black], f8);
             
-            remove_bit(chess_board.piece_boards[r], h8);
-            remove_bit(chess_board.occupancies[black], h8);
+            clear_bit(chess_board.piece_boards[r], h8);
+            clear_bit(chess_board.occupancies[black], h8);
 
             break;
         
@@ -844,8 +866,8 @@ bool ChessEngine::make_move(int move)
             set_bit(chess_board.piece_boards[r], d8);
             set_bit(chess_board.occupancies[black], d8);
             
-            remove_bit(chess_board.piece_boards[r], a8);
-            remove_bit(chess_board.occupancies[black], a8);
+            clear_bit(chess_board.piece_boards[r], a8);
+            clear_bit(chess_board.occupancies[black], a8);
         }
     }
 
@@ -867,13 +889,43 @@ bool ChessEngine::make_move(int move)
     }
 }
 
+int ChessEngine::static_eval()
+{
+    int value = 0;
+    U64 bitboard;
+    int index;
+
+    for (int piece = 0; piece < 6; piece++)
+    {
+        bitboard = chess_board.piece_boards[piece];
+        while (bitboard)
+        {
+            index = index_least_sig(bitboard);
+            value += (endgame_flag ? eg_table[piece][index] : mg_table[piece][index]);
+            clear_bit(bitboard, index);
+        }
+    }
+    for (int piece = 6; piece < 12; piece++)
+    {
+        bitboard = chess_board.piece_boards[piece];
+        while (bitboard)
+        {
+            index = index_least_sig(bitboard);
+            value -= (endgame_flag ? eg_table[piece][index] : mg_table[piece][index]);
+            clear_bit(bitboard, index);
+        }
+    }
+
+    return value;
+}
+
 int ChessEngine::minimax(int depth, int alpha, int beta)
 {   
     if (depth == 0)
-        return evaluate_board(chess_board);
+        return static_eval();
     
     std::stack<int> move_stack;
-    generate_moves(&move_stack);
+    find_moves(&move_stack);
     int move;
 
     if (chess_board.side == white)
@@ -897,7 +949,7 @@ int ChessEngine::minimax(int depth, int alpha, int beta)
             if (eval > max_eval)
             {
                 max_eval = eval;
-                if (depth == search_depth) best_move = move;
+                if (depth == default_search_depth) best_move = move;
             }
             std::max(alpha, eval);
 
@@ -925,7 +977,7 @@ int ChessEngine::minimax(int depth, int alpha, int beta)
             if (eval < min_eval)
             {
                 min_eval = eval;
-                if (depth == search_depth) best_move = move;
+                if (depth == default_search_depth) best_move = move;
             }
             std::min(beta, eval);
 
@@ -939,6 +991,6 @@ int ChessEngine::minimax(int depth, int alpha, int beta)
 
 void ChessEngine::search()
 {
-    minimax(search_depth, -99999, 99999);
+    minimax(default_search_depth, -99999, 99999);
     UCI_send_move(best_move);
 }

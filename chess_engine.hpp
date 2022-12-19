@@ -1,27 +1,21 @@
 #pragma once
 #include <stack>
-#include "bitboard.hpp"
-#include "magic.hpp"
+#include "representation.hpp"
+#include "move_gen.hpp"
 #include "main.hpp"
-#include "evaluate.hpp"
 #include <map>
 
 void print_chessboard(Board chess_board);
 
-class ChessEngine : public MagicMove
+class ChessEngine : public MoveGen
 {
     private:
-    U64 pawn_attacks[2][64];
-    U64 knight_attacks[64];
-    U64 king_attacks[64];
-
-    U64 pawn_mask(int color, int index);
-    U64 knight_mask(int index);
-    U64 king_mask(int index);
-
-    MagicMove slide_move_gen;
-
-    int search_depth = 4;
+    MoveGen move_gen;
+    int default_search_depth;
+    int best_move;
+    bool endgame_flag = false;
+    int mg_table[12][64];
+    int eg_table[12][64];
 
     bool check_if_attacked(int index);
     bool make_move(int move);
@@ -30,17 +24,14 @@ class ChessEngine : public MagicMove
     void UCI_send_move(int move);
     int UCI_get_move(char* command_ptr);
 
+    int static_eval();
 public:
-    ChessEngine();
+    ChessEngine(int search_depth);
     Board chess_board;
-    
-    int ply;
-    int best_move;
-
     void load_FEN(char *FEN);
     void UCI_get_position(char* command_ptr);
     void UCI_go(char* command_ptr);
     void UCI_main_loop();
-    void generate_moves(std::stack<int>* move_stack);
+    void find_moves(std::stack<int>* move_stack);
     void search();
 };
